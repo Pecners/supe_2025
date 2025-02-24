@@ -149,7 +149,7 @@ leaflet(wider) |>
               popupOptions = popupOptions(autoPan = TRUE),
               highlight = highlightOptions(color = "black", fillColor = "white",
                                            fillOpacity = .25, bringToFront = TRUE)) |> 
-  addLegend(pal = pal, values = ~n, position = "topright", title = "Unerdly Margin")
+  addLegend(pal = pal, values = ~n, position = "topright", title = "Underly Margin")
 
 ```
 
