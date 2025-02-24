@@ -63,6 +63,11 @@ wider <- all |>
   select(-c(votes, col)) |> 
   pivot_wider(names_from = candidate, values_from = perc) |> 
   left_join(wins)
+
+wider_n <- all |> 
+  select(-c(perc, col)) |> 
+  pivot_wider(names_from = candidate, values_from = votes) |> 
+  left_join(wins)
 ```
 
 ## Ward Winners
@@ -117,5 +122,61 @@ leaflet(wider) |>
               highlight = highlightOptions(color = "black", fillColor = "white",
                                            fillOpacity = .25, bringToFront = TRUE)) |> 
   addLegend(pal = pal, values = ~n, position = "topright", title = "Kinser Margin")
+
+```
+
+## Underly Margin
+
+```{r underly_margin}
+#| fig-height: 11
+
+pa <- sequential_hcl(5, "YlOrRd")
+pal <- colorBin(rev(pa), domain = c(0, 1))
+
+
+leaflet(wider) |>
+  addMapboxTiles(style_id = "light-v11",
+                 username = "mapbox",
+                 scaling_factor = "0.5x") |>
+  addPolygons(weight = 2,
+              fillColor = ~pal(`Jill Underly`), 
+              fillOpacity = .9, 
+              color = "white",
+              popup = glue("<strong>Ward {wider$ward}</strong>",
+                           "<br>Wright: {label_percent(.1)(wider$`Jeff Wright`)}",
+                           "<br>Kinser: {label_percent(.1)(wider$`Brittany Kinser`)}",
+                           "<br>Underly: {label_percent(.1)(wider$`Jill Underly`)}"),
+              popupOptions = popupOptions(autoPan = TRUE),
+              highlight = highlightOptions(color = "black", fillColor = "white",
+                                           fillOpacity = .25, bringToFront = TRUE)) |> 
+  addLegend(pal = pal, values = ~n, position = "topright", title = "Unerdly Margin")
+
+```
+
+## Underly Vote Count
+
+```{r underly_count}
+#| fig-height: 11
+
+pa <- sequential_hcl(5, "YlOrRd")
+pal <- colorBin(rev(pa), domain = c(0, 400))
+
+
+leaflet(wider_n) |>
+  addMapboxTiles(style_id = "light-v11",
+                 username = "mapbox",
+                 scaling_factor = "0.5x") |>
+  addPolygons(weight = 2,
+              fillColor = ~pal(`Jill Underly`), 
+              fillOpacity = .9, 
+              color = "white",
+              popup = glue("<strong>Ward {wider_n$ward}</strong>",
+                           "<br>Wright: {wider_n$`Jeff Wright`}",
+                           "<br>Kinser: {wider_n$`Brittany Kinser`}",
+                           "<br>Underly: {wider_n$`Jill Underly`}"),
+              popupOptions = popupOptions(autoPan = TRUE),
+              highlight = highlightOptions(color = "black", fillColor = "white",
+                                           fillOpacity = .25, bringToFront = TRUE)) |> 
+  addLegend(pal = pal, values = ~n, position = "topright", title = "Underly Margin")
 
 ```
