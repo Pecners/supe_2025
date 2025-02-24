@@ -68,4 +68,11 @@ leaflet(wider) |>
             labels = c("Wright", "Kinser", "Underly"), 
             position = "topright")
 
+read_csv("data/votes.csv") |> 
+  filter(str_detect(Ward, "City of Milwaukee")) |> 
+  pivot_longer(cols = c(3:6), names_to = "candidate", values_to = "votes") |> 
+  group_by(candidate) |> 
+  summarise(total = sum(votes)) |> 
+  mutate(perc = total / sum(total))
+
   

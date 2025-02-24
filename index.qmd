@@ -70,6 +70,32 @@ wider_n <- all |>
   left_join(wins)
 ```
 
+## City of Milwaukee vote margin
+
+```{r citywide}
+overall <- read_csv("data/votes.csv") |> 
+  filter(str_detect(Ward, "City of Milwaukee")) |> 
+  pivot_longer(cols = c(3:6), names_to = "candidate", values_to = "votes") |> 
+  group_by(candidate) |> 
+  summarise(total = sum(votes)) |> 
+  mutate(perc = total / sum(total))
+
+overall |> 
+  filter(candidate != "write-in:") |> 
+  ggplot(aes(candidate, perc, fill = candidate)) +
+  geom_col(width = .75) +
+  geom_text(aes(label = label_percent(.1)(perc)),
+            fontface = "bold", size = 8, nudge_y = .02) +
+  scale_y_continuous(labels = label_percent(),
+                     breaks = c(0, .25, .5)) +
+  scale_fill_manual(values = cols[c(2,1,3)]) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(),
+        legend.position = "none",
+        axis.text.x = element_text(face = "bold", size = 14)) +
+  labs(y = "", x = "")
+```
 ## Ward Winners
 
 The map below shows the results of the spring primary for DPI Superintendent in the city of Milwaukee. Boundaries represent wards.
