@@ -1,5 +1,5 @@
 ---
-title: "2025 DPI Superintendent Election results in Milwaukee"
+title: "2025 DPI Superintendent Primary results in Milwaukee"
 format: 
   html:
     embed-resources: true
@@ -22,25 +22,24 @@ library(mapboxapi)
 library(mapboxer)
 library(glue)
 library(scales)
-library(janitor)
 
 cols <- c(
   "#1F77B4",
-  "#FF7F0E"
-  # "#2CA02C"
+  "#FF7F0E",
+  "#2CA02C"
 )
 
-d <- read_csv("data/dpi_supe_results_2025.csv") |> 
-  clean_names() |> 
-  mutate(ward = str_remove(ward, "City of Milwaukee Ward ") |> 
+d <- read_csv("data/votes.csv") |> 
+  mutate(ward = str_remove(Ward, "City of Milwaukee Ward ") |> 
            str_trim()) |> 
-  pivot_longer(cols = c(2:4), names_to = "candidate", values_to = "votes") |> 
+  pivot_longer(cols = c(3:6), names_to = "candidate", values_to = "votes") |> 
+  select(-c(id, Ward)) |> 
   group_by(ward) |> 
   mutate(perc = votes / sum(votes),
          col = case_when(
-           candidate == "brittany_kinser" ~ cols[1],
-           candidate == "jill_underly" ~ cols[2],
-           TRUE ~ cols[3]
+           candidate == "Jeff Wright" ~ cols[1],
+           candidate == "Brittany Kinser" ~ cols[2],
+           candidate == "Jill Underly" ~ cols[3]
          ))
 
 w <- st_read("data/ward/ward.shp", quiet = TRUE) |> 
@@ -74,10 +73,9 @@ wider_n <- all |>
 ## City of Milwaukee vote margin
 
 ```{r citywide}
-overall <- read_csv("data/dpi_supe_results_2025.csv") |> 
-  # clean_names() |> 
+overall <- read_csv("data/votes.csv") |> 
   filter(str_detect(Ward, "City of Milwaukee")) |> 
-  pivot_longer(cols = c(2:4), names_to = "candidate", values_to = "votes") |> 
+  pivot_longer(cols = c(3:6), names_to = "candidate", values_to = "votes") |> 
   group_by(candidate) |> 
   summarise(total = sum(votes)) |> 
   mutate(perc = total / sum(total))
@@ -93,7 +91,7 @@ overall |>
   coord_cartesian(clip = "off") +
   scale_y_continuous(labels = label_percent(),
                      breaks = c(0, .25, .5),
-                     limits = c(0, 1)) +
+                     limits = c(0, .6)) +
   scale_fill_manual(values = cols[c(2,1,3)]) +
   theme_minimal() +
   theme(panel.grid.minor = element_blank(),
@@ -118,15 +116,14 @@ leaflet(wider) |>
               fillColor = wider$col, fillOpacity = .9,
               color = "white",
               popup = glue("<strong>Ward {wider$ward}</strong>",
-                           "<br>Kinser: {label_percent(.1)(wider$brittany_kinser)}",
-                           ", ({label_comma()(wider_n$brittany_kinser)})",
-                           "<br>Underly: {label_percent(.1)(wider$jill_underly)}",
-                           ", ({label_comma()(wider_n$jill_underly)})"),
+                           "<br>Wright: {label_percent(.1)(wider$`Jeff Wright`)}",
+                           "<br>Kinser: {label_percent(.1)(wider$`Brittany Kinser`)}",
+                           "<br>Underly: {label_percent(.1)(wider$`Jill Underly`)}"),
               popupOptions = popupOptions(autoPan = TRUE),
               highlight = highlightOptions(color = "black", fillColor = "white",
                                            fillOpacity = .25, bringToFront = TRUE)) |> 
   addLegend(colors = cols, opacity = 1, 
-            labels = c("Kinser", "Underly"), 
+            labels = c("Wright", "Kinser", "Underly"), 
             position = "topright")
 
 ```
@@ -144,16 +141,17 @@ leaflet(wider) |>
                  username = "mapbox",
                  scaling_factor = "0.5x") |>
   addPolygons(weight = 2,
-              fillColor = ~pal(brittany_kinser), 
+              fillColor = ~pal(`Brittany Kinser`), 
               fillOpacity = .9, 
               color = "white",
               popup = glue("<strong>Ward {wider$ward}</strong>",
-                           "<br>Kinser: {label_percent(.1)(wider$brittany_kinser)}",
-                           "<br>Underly: {label_percent(.1)(wider$jill_underly)}"),
+                           "<br>Wright: {label_percent(.1)(wider$`Jeff Wright`)}",
+                           "<br>Kinser: {label_percent(.1)(wider$`Brittany Kinser`)}",
+                           "<br>Underly: {label_percent(.1)(wider$`Jill Underly`)}"),
               popupOptions = popupOptions(autoPan = TRUE),
               highlight = highlightOptions(color = "black", fillColor = "white",
                                            fillOpacity = .25, bringToFront = TRUE)) |> 
-  addLegend(pal = pal, values = ~n, position = "topright", title = "Kinser Vote %")
+  addLegend(pal = pal, values = ~n, position = "topright", title = "Kinser Margin")
 
 ```
 
@@ -171,16 +169,17 @@ leaflet(wider) |>
                  username = "mapbox",
                  scaling_factor = "0.5x") |>
   addPolygons(weight = 2,
-              fillColor = ~pal(jill_underly), 
+              fillColor = ~pal(`Jill Underly`), 
               fillOpacity = .9, 
               color = "white",
               popup = glue("<strong>Ward {wider$ward}</strong>",
-                           "<br>Kinser: {label_percent(.1)(wider$brittany_kinser)}",
-                           "<br>Underly: {label_percent(.1)(wider$jill_underly)}"),
+                           "<br>Wright: {label_percent(.1)(wider$`Jeff Wright`)}",
+                           "<br>Kinser: {label_percent(.1)(wider$`Brittany Kinser`)}",
+                           "<br>Underly: {label_percent(.1)(wider$`Jill Underly`)}"),
               popupOptions = popupOptions(autoPan = TRUE),
               highlight = highlightOptions(color = "black", fillColor = "white",
                                            fillOpacity = .25, bringToFront = TRUE)) |> 
-  addLegend(pal = pal, values = ~n, position = "topright", title = "Underly Vote %")
+  addLegend(pal = pal, values = ~n, position = "topright", title = "Underly Margin")
 
 ```
 
@@ -190,7 +189,7 @@ leaflet(wider) |>
 #| fig-height: 11
 
 pa <- sequential_hcl(5, "YlOrRd")
-pal <- colorBin(rev(pa), domain = c(0, 1150))
+pal <- colorBin(rev(pa), domain = c(0, 400))
 
 
 leaflet(wider_n) |>
@@ -198,15 +197,16 @@ leaflet(wider_n) |>
                  username = "mapbox",
                  scaling_factor = "0.5x") |>
   addPolygons(weight = 2,
-              fillColor = ~pal(jill_underly), 
+              fillColor = ~pal(`Jill Underly`), 
               fillOpacity = .9, 
               color = "white",
               popup = glue("<strong>Ward {wider_n$ward}</strong>",
-                           "<br>Kinser: {wider_n$brittany_kinser}",
-                           "<br>Underly: {wider_n$jill_underly}"),
+                           "<br>Wright: {wider_n$`Jeff Wright`}",
+                           "<br>Kinser: {wider_n$`Brittany Kinser`}",
+                           "<br>Underly: {wider_n$`Jill Underly`}"),
               popupOptions = popupOptions(autoPan = TRUE),
               highlight = highlightOptions(color = "black", fillColor = "white",
                                            fillOpacity = .25, bringToFront = TRUE)) |> 
-  addLegend(pal = pal, values = ~n, position = "topright", title = "Underly Votes")
+  addLegend(pal = pal, values = ~n, position = "topright", title = "Underly Margin")
 
 ```
