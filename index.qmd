@@ -24,38 +24,59 @@ library(glue)
 library(scales)
 library(janitor)
 
+mke <- read_rds("data/mke.rda")
 cols <- c(
   "#1F77B4",
   "#FF7F0E"
   # "#2CA02C"
 )
+# scowis <- read_csv("data/scowis_results_2025.csv") |> 
+#   clean_names() |> 
+#   mutate(ward = str_remove(ward, "City of Milwaukee Ward ") |> 
+#            str_trim())
 
-d <- read_csv("data/dpi_supe_results_2025.csv") |> 
+scowis <- read_csv("data/scowis_results_2025.csv") |> 
+  clean_names()
+
+# d <- read_csv("data/dpi_supe_results_2025.csv") |> 
+#   clean_names() |> 
+#   mutate(ward = str_remove(ward, "City of Milwaukee Ward ") |> 
+#            str_trim()) |> 
+#   pivot_longer(cols = c(2:4), names_to = "candidate", values_to = "votes") |> 
+#   group_by(ward) |> 
+#   mutate(perc = votes / sum(votes),
+#          col = case_when(
+#            candidate == "brittany_kinser" ~ cols[1],
+#            candidate == "jill_underly" ~ cols[2],
+#            TRUE ~ cols[3]
+#          ))
+
+all <- read_rds("data/cleaned_supe_race_data.rda") |> 
   clean_names() |> 
-  mutate(ward = str_remove(ward, "City of Milwaukee Ward ") |> 
-           str_trim()) |> 
-  pivot_longer(cols = c(2:4), names_to = "candidate", values_to = "votes") |> 
-  group_by(ward) |> 
+  pivot_longer(cols = c(1:3), names_to = "candidate", values_to = "votes") |> 
+  group_by(new_lab) |> 
   mutate(perc = votes / sum(votes),
          col = case_when(
            candidate == "brittany_kinser" ~ cols[1],
            candidate == "jill_underly" ~ cols[2],
            TRUE ~ cols[3]
-         ))
-
-w <- st_read("data/ward/ward.shp", quiet = TRUE) |> 
-  transmute(ward = WARD,
-            geometry)
-
-
-all <- left_join(w, d) |>
+         )) |> 
   st_transform(crs = 4326)
+
+# w <- st_read("data/ward/ward.shp", quiet = TRUE) |> 
+#   transmute(ward = WARD,
+#             geometry)
+
+
+# all <- left_join(d, scowis, by = c("original_ward" = "ward")) |>
+#   st_transform(crs = 4326)
 
 wins <- all |> 
   as_tibble() |> 
-  group_by(ward) |> 
+  group_by(new_lab) |> 
   filter(perc == max(perc)) |> 
-  select(ward, 
+  ungroup() |> 
+  select(new_lab, 
          winner = candidate,
          perc,
          col)
@@ -68,7 +89,18 @@ wider <- all |>
 wider_n <- all |> 
   select(-c(perc, col)) |> 
   pivot_wider(names_from = candidate, values_from = votes) |> 
-  left_join(wins)
+  left_join(wins) |> 
+  left_join(scowis, by = c("original_ward" = "ward")) |> 
+  mutate(u_marg = jill_underly - brittany_kinser,
+         under_under = susan_crawford - jill_underly,
+         kinser_over = brittany_kinser - brad_schimel,
+         kinser_metric = kinser_over / (susan_crawford+brad_schimel+write_in.y),
+         sc_col = case_when(
+           susan_crawford > brad_schimel ~ cols[1],
+           brad_schimel > susan_crawford ~ cols[2],
+           TRUE ~ "grey"
+         ))
+
 ```
 
 ## City of Milwaukee vote margin
@@ -92,15 +124,43 @@ overall |>
             lineheight = .9) +
   coord_cartesian(clip = "off") +
   scale_y_continuous(labels = label_percent(),
-                     breaks = c(0, .25, .5),
+                     breaks = c(0, .25, .5, .75),
                      limits = c(0, 1)) +
-  scale_fill_manual(values = cols[c(2,1,3)]) +
+  scale_fill_manual(values = cols[c(1,2,3)]) +
   theme_minimal() +
   theme(panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank(),
         legend.position = "none",
-        axis.text.x = element_text(face = "bold", size = 14)) +
+        axis.text.x = element_text(face = "bold", size = 18)) +
   labs(y = "", x = "")
+```
+
+## Underly's Net Vote
+
+```{r winner_margin}
+#| fig-height: 11
+
+pa <- sequential_hcl(5, "YlOrRd")
+pal <- colorBin(rev(pa), domain = c(-10, 920))
+
+
+leaflet(wider_n) |>
+  addMapboxTiles(style_id = "light-v11",
+                 username = "mapbox",
+                 scaling_factor = "0.5x") |>
+  addPolygons(weight = 2,
+              fillColor = ~pal(u_marg), 
+              fillOpacity = .9, 
+              color = "white",
+              popup = glue("<strong>Ward {wider_n$ward}</strong>",
+                           "<br>Kinser: {wider_n$brittany_kinser}",
+                           "<br>Underly: {wider_n$jill_underly}",
+                           "<br>Underly's Net: {wider_n$u_marg}"),
+              popupOptions = popupOptions(autoPan = TRUE),
+              highlight = highlightOptions(color = "black", fillColor = "white",
+                                           fillOpacity = .25, bringToFront = TRUE)) |> 
+  addLegend(pal = pal, values = ~n, position = "topright", title = "Underly Net")
+
 ```
 
 ## Ward Winners
@@ -117,7 +177,7 @@ leaflet(wider) |>
   addPolygons(weight = 2,
               fillColor = wider$col, fillOpacity = .9,
               color = "white",
-              popup = glue("<strong>Ward {wider$ward}</strong>",
+              popup = glue("<strong>Ward {wider$new_lab}</strong>",
                            "<br>Kinser: {label_percent(.1)(wider$brittany_kinser)}",
                            ", ({label_comma()(wider_n$brittany_kinser)})",
                            "<br>Underly: {label_percent(.1)(wider$jill_underly)}",
@@ -125,6 +185,10 @@ leaflet(wider) |>
               popupOptions = popupOptions(autoPan = TRUE),
               highlight = highlightOptions(color = "black", fillColor = "white",
                                            fillOpacity = .25, bringToFront = TRUE)) |> 
+  addPolygons(data = mke,
+              weight = 2, 
+              fillColor = NA, 
+              color = "black") |> 
   addLegend(colors = cols, opacity = 1, 
             labels = c("Kinser", "Underly"), 
             position = "topright")
@@ -153,7 +217,37 @@ leaflet(wider) |>
               popupOptions = popupOptions(autoPan = TRUE),
               highlight = highlightOptions(color = "black", fillColor = "white",
                                            fillOpacity = .25, bringToFront = TRUE)) |> 
+    addPolylines(data = mke,
+              weight = 2, 
+              color = "black") |> 
   addLegend(pal = pal, values = ~n, position = "topright", title = "Kinser Vote %")
+
+```
+
+## Kinser Vote Count
+
+```{r kinser_count}
+#| fig-height: 11
+
+pa <- sequential_hcl(5, "YlOrRd")
+pal <- colorBin(rev(pa), domain = c(0, 1150))
+
+
+leaflet(wider_n) |>
+  addMapboxTiles(style_id = "light-v11",
+                 username = "mapbox",
+                 scaling_factor = "0.5x") |>
+  addPolygons(weight = 2,
+              fillColor = ~pal(brittany_kinser), 
+              fillOpacity = .9, 
+              color = "white",
+              popup = glue("<strong>Ward {wider_n$ward}</strong>",
+                           "<br>Kinser: {wider_n$brittany_kinser}",
+                           "<br>Underly: {wider_n$jill_underly}"),
+              popupOptions = popupOptions(autoPan = TRUE),
+              highlight = highlightOptions(color = "black", fillColor = "white",
+                                           fillOpacity = .25, bringToFront = TRUE)) |> 
+  addLegend(pal = pal, values = ~n, position = "topright", title = "Kinser Votes")
 
 ```
 
@@ -208,5 +302,45 @@ leaflet(wider_n) |>
               highlight = highlightOptions(color = "black", fillColor = "white",
                                            fillOpacity = .25, bringToFront = TRUE)) |> 
   addLegend(pal = pal, values = ~n, position = "topright", title = "Underly Votes")
+
+this <- wider_n |> 
+  filter(perc >= .8 & u_marg >= 375) 
+
+this_perc_margin <- sum(this$u_marg) / sum(wider_n$u_marg)
+
+this_perc_wards <- nrow(this) / nrow(wider_n)
+
+```
+
+## Underly Hotspots
+
+The Underly vote in the wards below was at least 80% of the vote with at least a 375 vote margin. These wards represent `r label_percent()(this_perc_wards)` of wards in the city, but Underly's margin here makes up `r label_percent(.1)(this_perc_margin)` of her total margin in the city.
+
+```{r underly_hotspots}
+#| fig-height: 11
+
+pa <- sequential_hcl(5, "YlOrRd")
+pal <- colorBin(rev(pa), domain = c(0, 1150))
+
+
+
+
+
+leaflet(this) |>
+  addMapboxTiles(style_id = "light-v11",
+                 username = "mapbox",
+                 scaling_factor = "0.5x") |>
+  addPolygons(weight = 2,
+              fillColor = ~pal(u_marg), 
+              fillOpacity = .9, 
+              color = "white",
+              popup = glue("<strong>Ward {this$ward}</strong>",
+                           "<br>Kinser: {this$brittany_kinser}",
+                           "<br>Underly: {this$jill_underly}",
+                           "<br>Underly's Net: {this$u_marg}"),
+              popupOptions = popupOptions(autoPan = TRUE),
+              highlight = highlightOptions(color = "black", fillColor = "white",
+                                           fillOpacity = .25, bringToFront = TRUE)) |> 
+  addLegend(pal = pal, values = ~n, position = "topright", title = "Underly Net")
 
 ```
